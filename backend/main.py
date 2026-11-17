@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 import hmac
+import unicodedata
 
 from fastapi import Depends, FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -60,6 +61,17 @@ class ReservationIn(BaseModel):
     name: str = Field(min_length=2, max_length=80)
 
 
+def clean_name(raw: str) -> str:
+    parts = raw.strip().split()
+    if len(parts) != 2 or not all(part.replace("-", "").replace("'", "").isalpha() for part in parts):
+        raise HTTPException(422, "Escribe tu primer nombre y primer apellido")
+    return " ".join(parts)
+
+
+def name_key(name: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", name.casefold()) if not unicodedata.combining(c))
+
+
 class GiftIn(BaseModel):
     title: str = Field(min_length=2, max_length=100)
     category: str = Field(default="Esenciales", max_length=40)
@@ -98,11 +110,19 @@ def list_gifts():
     return [public_gift(g) for g in gifts.find().sort("created_at", 1)]
 
 
+@app.post("/api/gifts/find")
+def find_my_gifts(data: ReservationIn):
+    key = name_key(clean_name(data.name))
+    matches = []
+    for gift in gifts.find({}, {"title": 1, "category": 1, "reservations.name": 1}):
+        if any(name_key(r["name"]) == key for r in gift.get("reservations", [])):
+            matches.append({"title": gift["title"], "category": gift["category"]})
+    return {"gifts": matches}
+
+
 @app.post("/api/gifts/{gift_id}/reserve")
 def reserve(gift_id: str, data: ReservationIn):
-    name = " ".join(data.name.strip().split())
-    if len(name) < 2:
-        raise HTTPException(422, "Escribe tu nombre")
+    name = clean_name(data.name)
     reservation = {"id": str(uuid4()), "name": name, "created_at": datetime.now(timezone.utc)}
     gift = gifts.find_one_and_update(
         {"_id": gift_id, "$expr": {"$lt": [{"$size": {"$ifNull": ["$reservations", []]}}, "$quantity"]}},

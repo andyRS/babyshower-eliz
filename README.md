@@ -1,6 +1,6 @@
 # Baby shower de Eliz Maribeth
 
-Aplicación React + FastAPI + MongoDB Atlas para reservar regalos. La vista pública muestra disponibilidad sin exponer nombres; el panel de administración permite ver reservas, agregar y editar regalos, quitar reservas y eliminar regalos sin reservas.
+Aplicación React + FastAPI + MongoDB Atlas para reservar regalos. La vista pública muestra disponibilidad y permite recordar un regalo mediante el primer nombre y primer apellido usados en la reserva, sin mostrar la lista de nombres. El panel de administración permite ver reservas, agregar y editar regalos, quitar reservas y eliminar regalos sin reservas.
 
 ## Inicio rápido
 

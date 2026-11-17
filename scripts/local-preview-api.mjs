@@ -13,6 +13,7 @@ createServer(async(req,res)=>{
   let body={};try{for await(const chunk of req)body=JSON.parse(chunk.toString())}catch{}
   const path=new URL(req.url,'http://localhost').pathname;
   if(path==='/api/gifts'&&req.method==='GET')return send(res,200,gifts.map(publicGift));
+  if(path==='/api/gifts/find'&&req.method==='POST'){const name=String(body.name||'').trim().replace(/\s+/g,' ');if(!/^\p{L}+(?:[-']\p{L}+)? \p{L}+(?:[-']\p{L}+)?$/u.test(name))return send(res,422,{detail:'Escribe tu primer nombre y primer apellido'});const key=s=>s.normalize('NFD').replace(/\p{M}/gu,'').toLocaleLowerCase();return send(res,200,{gifts:gifts.filter(g=>g.reservations.some(r=>key(r.name)===key(name))).map(g=>({title:g.title,category:g.category}))})}
   if(path==='/api/admin/login'&&req.method==='POST')return send(res,200,{token:'local-preview'});
   if(path.startsWith('/api/admin/')&&req.headers.authorization!=='Bearer local-preview')return send(res,401,{detail:'Acceso de administrador requerido'});
   if(path==='/api/admin/gifts'&&req.method==='GET')return send(res,200,gifts.map(g=>({...publicGift(g),reservations:g.reservations})));
@@ -20,7 +21,7 @@ createServer(async(req,res)=>{
   const match=path.match(/^\/api\/(?:admin\/)?gifts\/([^/]+)(?:\/(reserve|reservations)(?:\/([^/]+))?)?$/);
   if(!match)return send(res,404,{detail:'No encontrado'});
   const gift=gifts.find(g=>g.id===match[1]);if(!gift)return send(res,404,{detail:'Regalo no encontrado'});
-  if(match[2]==='reserve'&&req.method==='POST'){if(gift.reservations.length>=gift.quantity)return send(res,409,{detail:'Este regalo ya está completo'});if(!body.name?.trim())return send(res,422,{detail:'Escribe tu nombre'});gift.reservations.push({id:randomUUID(),name:body.name.trim(),created_at:new Date().toISOString()});return send(res,200,{gift:publicGift(gift)})}
+  if(match[2]==='reserve'&&req.method==='POST'){if(gift.reservations.length>=gift.quantity)return send(res,409,{detail:'Este regalo ya está completo'});const name=String(body.name||'').trim().replace(/\s+/g,' ');if(!/^\p{L}+(?:[-']\p{L}+)? \p{L}+(?:[-']\p{L}+)?$/u.test(name))return send(res,422,{detail:'Escribe tu primer nombre y primer apellido'});gift.reservations.push({id:randomUUID(),name,created_at:new Date().toISOString()});return send(res,200,{gift:publicGift(gift)})}
   if(match[2]==='reservations'&&req.method==='DELETE'){gift.reservations=gift.reservations.filter(r=>r.id!==match[3]);return send(res,200,{ok:true})}
   if(req.method==='PATCH'){if(body.quantity<gift.reservations.length)return send(res,409,{detail:'La cantidad no puede ser menor que las reservas actuales'});Object.assign(gift,body);return send(res,200,publicGift(gift))}
   if(req.method==='DELETE'){if(gift.reservations.length)return send(res,409,{detail:'Quita las reservas antes de eliminar el regalo'});gifts.splice(gifts.indexOf(gift),1);return send(res,200,{ok:true})}
