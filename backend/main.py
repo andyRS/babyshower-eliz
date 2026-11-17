@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 import hmac
 import unicodedata
 
@@ -61,6 +61,12 @@ class ReservationIn(BaseModel):
     name: str = Field(min_length=2, max_length=80)
 
 
+class ChangeGiftIn(ReservationIn):
+    from_gift_id: str
+    reservation_id: str
+    to_gift_id: str
+
+
 def clean_name(raw: str) -> str:
     parts = raw.strip().split()
     if len(parts) != 2 or not all(part.replace("-", "").replace("'", "").isalpha() for part in parts):
@@ -70,6 +76,10 @@ def clean_name(raw: str) -> str:
 
 def name_key(name: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", name.casefold()) if not unicodedata.combining(c))
+
+
+def person_id(name: str) -> str:
+    return str(uuid5(NAMESPACE_URL, "babyshower-eliz:" + name_key(name)))
 
 
 class GiftIn(BaseModel):
@@ -119,16 +129,52 @@ def list_gifts():
 def find_my_gifts(data: ReservationIn):
     key = name_key(clean_name(data.name))
     matches = []
-    for gift in gifts.find({}, {"title": 1, "category": 1, "reservations.name": 1}):
-        if any(name_key(r["name"]) == key for r in gift.get("reservations", [])):
-            matches.append({"title": gift["title"], "category": gift["category"]})
+    for gift in gifts.find({}, {"title": 1, "category": 1, "reservations.name": 1, "reservations.id": 1}):
+        for reservation in gift.get("reservations", []):
+            if name_key(reservation["name"]) == key:
+                matches.append({"id": gift["_id"], "reservation_id": reservation["id"], "title": gift["title"], "category": gift["category"]})
     return {"gifts": matches}
+
+
+@app.post("/api/gifts/change")
+def change_gift(data: ChangeGiftIn):
+    if data.from_gift_id == data.to_gift_id:
+        raise HTTPException(400, "Elige un regalo diferente")
+    key = name_key(clean_name(data.name))
+
+    def move(session):
+        previous = gifts.find_one({"_id": data.from_gift_id, "reservations.id": data.reservation_id}, session=session)
+        if previous is None:
+            raise HTTPException(409, "No encontramos tu reserva anterior. Vuelve a buscarla")
+        reservation = next((r for r in previous["reservations"] if r["id"] == data.reservation_id), None)
+        if reservation is None or reservation.get("person_id", person_id(reservation["name"])) != person_id(data.name) or name_key(reservation["name"]) != key:
+            raise HTTPException(403, "El nombre no coincide con la reserva")
+        reservation = {**reservation, "person_id": person_id(data.name)}
+        updated = gifts.find_one_and_update(
+            {"_id": data.to_gift_id, "$expr": {"$lt": [{"$size": {"$ifNull": ["$reservations", []]}}, "$quantity"]}},
+            {"$push": {"reservations": reservation}},
+            return_document=ReturnDocument.AFTER,
+            session=session,
+        )
+        if updated is None:
+            raise HTTPException(409, "El nuevo regalo ya no está disponible")
+        removed = gifts.update_one(
+            {"_id": data.from_gift_id, "reservations.id": data.reservation_id},
+            {"$pull": {"reservations": {"id": data.reservation_id}}},
+            session=session,
+        )
+        if removed.modified_count != 1:
+            raise HTTPException(409, "La reserva cambió. Vuelve a buscarla")
+        return {"gift": public_gift(updated)}
+
+    with client.start_session() as session:
+        return session.with_transaction(move)
 
 
 @app.post("/api/gifts/{gift_id}/reserve")
 def reserve(gift_id: str, data: ReservationIn):
     name = clean_name(data.name)
-    reservation = {"id": str(uuid4()), "name": name, "created_at": datetime.now(timezone.utc)}
+    reservation = {"id": str(uuid4()), "person_id": person_id(name), "name": name, "created_at": datetime.now(timezone.utc)}
     gift = gifts.find_one_and_update(
         {"_id": gift_id, "$expr": {"$lt": [{"$size": {"$ifNull": ["$reservations", []]}}, "$quantity"]}},
         {"$push": {"reservations": reservation}}, return_document=ReturnDocument.AFTER,
