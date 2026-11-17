@@ -25,8 +25,8 @@ function App(){
   const [editing,setEditing]=useState(null), [form,setForm]=useState({title:'',category:'Esenciales',description:'',quantity:1,icon:'gift'}), [saving,setSaving]=useState(false), [quantityBusy,setQuantityBusy]=useState(null);
   async function load(){try{setError('');setGifts(await request('/api/gifts'));}catch(e){setError(e.message)}finally{setLoading(false)}}
   async function loadAdmin(auth=token){if(!auth)return;try{setAdminError('');setAdminGifts(await request('/api/admin/gifts',{token:auth}));}catch(e){setAdminError(e.message);if(e.message.includes('Sesión')){setToken('');sessionStorage.removeItem('eliz_admin')}}}
-  useEffect(()=>{load();const interval=setInterval(load,10000);return()=>clearInterval(interval)},[]);
-  useEffect(()=>{if(view==='admin')loadAdmin()},[view,token]);
+  useEffect(()=>{load();const interval=setInterval(load,5000);return()=>clearInterval(interval)},[]);
+  useEffect(()=>{if(view!=='admin'||!token)return;loadAdmin(token);const interval=setInterval(()=>loadAdmin(token),5000);return()=>clearInterval(interval)},[view,token]);
   useEffect(()=>{const onPop=()=>setView(location.pathname==='/admin'?'admin':'public');window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop)},[]);
   function navigate(next){setView(next);history.pushState({},'',next==='admin'?'/admin':'/');window.scrollTo({top:0,behavior:'smooth'})}
   async function reserve(e){e.preventDefault();if(!selected)return;setSending(true);setReserveError('');try{await request(`/api/gifts/${selected.id}/reserve`,{method:'POST',body:JSON.stringify({name})});setSuccess({name:name.trim(),gift:selected.title});setSelected(null);setName('');await load();}catch(e){setReserveError(e.message);await load()}finally{setSending(false)}}
