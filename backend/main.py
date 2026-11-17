@@ -96,6 +96,11 @@ def require_admin(authorization: str | None = Header(default=None)):
 
 def public_gift(gift):
     reservations = gift.get("reservations", [])
+    return {"id": gift["_id"], "title": gift["title"], "available": len(reservations) < gift["quantity"]}
+
+
+def admin_gift(gift):
+    reservations = gift.get("reservations", [])
     return {"id": gift["_id"], "title": gift["title"], "category": gift["category"], "description": gift.get("description", ""), "quantity": gift["quantity"], "reserved": len(reservations), "available": max(0, gift["quantity"] - len(reservations)), "icon": gift.get("icon", "gift")}
 
 
@@ -144,14 +149,14 @@ def login(data: LoginIn):
 
 @app.get("/api/admin/gifts", dependencies=[Depends(require_admin)])
 def admin_gifts():
-    return [{**public_gift(g), "reservations": [{"id": r["id"], "name": r["name"], "created_at": r["created_at"].isoformat()} for r in g.get("reservations", [])]} for g in gifts.find().sort("created_at", 1)]
+    return [{**admin_gift(g), "reservations": [{"id": r["id"], "name": r["name"], "created_at": r["created_at"].isoformat()} for r in g.get("reservations", [])]} for g in gifts.find().sort("created_at", 1)]
 
 
 @app.post("/api/admin/gifts", dependencies=[Depends(require_admin)])
 def create_gift(data: GiftIn):
     gift = {"_id": str(uuid4()), **data.model_dump(), "reservations": [], "created_at": datetime.now(timezone.utc)}
     gifts.insert_one(gift)
-    return public_gift(gift)
+    return admin_gift(gift)
 
 
 @app.patch("/api/admin/gifts/{gift_id}", dependencies=[Depends(require_admin)])
@@ -164,7 +169,7 @@ def update_gift(gift_id: str, data: GiftIn):
     updated = gifts.find_one_and_update({"_id": gift_id, "$expr": {"$lte": [{"$size": {"$ifNull": ["$reservations", []]}}, data.quantity]}}, {"$set": data.model_dump()}, return_document=ReturnDocument.AFTER)
     if updated is None:
         raise HTTPException(409, "Entró una nueva reserva; aumenta la cantidad y vuelve a intentar")
-    return public_gift(updated)
+    return admin_gift(updated)
 
 
 @app.delete("/api/admin/gifts/{gift_id}/reservations/{reservation_id}", dependencies=[Depends(require_admin)])
