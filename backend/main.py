@@ -46,7 +46,7 @@ def seed_example_gifts():
             ("Mantas", "Ropita y textiles", "Para arropar a Eliz.", 1, "heart"),
             ("Juego de gimnasio", "Juegos y descanso", "Para sus primeros juegos.", 1, "sparkles"),
             ("Corral", "Juegos y descanso", "Un espacio cómodo y seguro.", 1, "baby"),
-            ("Gavetero de bebé", "Habitación", "Para organizar sus cositas.", 1, "gift"),
+            ("Gavetero de bebé plástico", "Habitación", "Para organizar sus cositas.", 1, "gift"),
             ("Bañito", "Baño y cuidado", "Bañera para bebé.", 1, "bath"),
             ("Biberones pequeños", "Alimentación", "Biberones de tamaño pequeño.", 1, "milk"),
             ("Biberones grandes", "Alimentación", "Biberones de tamaño grande.", 1, "milk"),
