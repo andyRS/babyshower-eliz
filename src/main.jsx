@@ -9,6 +9,8 @@ import {playOpenSound} from './open-sound.js';
 
 const API = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '');
 const iconMap = {baby:Baby,sparkles:Sparkles,heart:Heart,shirt:Shirt,milk:Milk,bath:Bath,gift:Gift};
+const pamperSize = title => Number(/^pampers?\s*#\s*(\d+)/i.exec(title)?.[1] ?? Infinity);
+const sortGifts = rows => [...rows].sort((a,b)=>{const first=pamperSize(a.title),second=pamperSize(b.title);return first===second?0:first<second?-1:1});
 const request = async (path, options={}) => {
   const response = await fetch(`${API}${path}`, {...options, headers:{'Content-Type':'application/json', ...(options.token ? {Authorization:`Bearer ${options.token}`} : {})}});
   const body = await response.json().catch(()=>({}));
@@ -25,8 +27,8 @@ function App(){
   const [sheetOpen,setSheetOpen]=useState(false);
   const [token,setToken]=useState(sessionStorage.getItem('eliz_admin')||''), [password,setPassword]=useState(''), [adminError,setAdminError]=useState('');
   const [editing,setEditing]=useState(null), [form,setForm]=useState({title:'',category:'Esenciales',description:'',quantity:1,icon:'gift'}), [saving,setSaving]=useState(false), [quantityBusy,setQuantityBusy]=useState(null);
-  async function load(){try{setError('');setGifts(await request('/api/gifts'));}catch(e){setError(e.message)}finally{setLoading(false)}}
-  async function loadAdmin(auth=token){if(!auth)return;try{setAdminError('');setAdminGifts(await request('/api/admin/gifts',{token:auth}));}catch(e){setAdminError(e.message);if(e.message.includes('Sesión')){setToken('');sessionStorage.removeItem('eliz_admin')}}}
+  async function load(){try{setError('');setGifts(sortGifts(await request('/api/gifts')));}catch(e){setError(e.message)}finally{setLoading(false)}}
+  async function loadAdmin(auth=token){if(!auth)return;try{setAdminError('');setAdminGifts(sortGifts(await request('/api/admin/gifts',{token:auth})));}catch(e){setAdminError(e.message);if(e.message.includes('Sesión')){setToken('');sessionStorage.removeItem('eliz_admin')}}}
   useEffect(()=>{load();const interval=setInterval(load,5000);return()=>clearInterval(interval)},[]);
   useEffect(()=>{if(view!=='admin'||!token)return;loadAdmin(token);const interval=setInterval(()=>loadAdmin(token),5000);return()=>clearInterval(interval)},[view,token]);
   useEffect(()=>{const onPop=()=>setView(location.pathname==='/admin'?'admin':'public');window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop)},[]);
