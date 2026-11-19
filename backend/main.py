@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from uuid import NAMESPACE_URL, uuid4, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 import hmac
 import unicodedata
 
@@ -62,7 +62,7 @@ class ReservationIn(BaseModel):
 
 
 class LookupIn(ReservationIn):
-    code: str = Field(min_length=36, max_length=36)
+    codes: list[UUID] = Field(min_length=1, max_length=50)
 
 
 class ChangeGiftIn(ReservationIn):
@@ -132,13 +132,13 @@ def list_gifts():
 @app.post("/api/gifts/find")
 def find_my_gifts(data: LookupIn):
     key = name_key(clean_name(data.name))
-    gift = gifts.find_one({"reservations.id": data.code}, {"title": 1, "category": 1, "reservations.name": 1, "reservations.id": 1})
-    if gift is None:
-        return {"gifts": []}
-    reservation = next((r for r in gift.get("reservations", []) if r["id"] == data.code), None)
-    if reservation is None or name_key(reservation["name"]) != key:
-        return {"gifts": []}
-    return {"gifts": [{"id": gift["_id"], "reservation_id": reservation["id"], "title": gift["title"], "category": gift["category"]}]}
+    codes = {str(code) for code in data.codes}
+    matches = []
+    for gift in gifts.find({"reservations.id": {"$in": list(codes)}}, {"title": 1, "category": 1, "reservations.name": 1, "reservations.id": 1}):
+        for reservation in gift.get("reservations", []):
+            if reservation["id"] in codes and name_key(reservation["name"]) == key:
+                matches.append({"id": gift["_id"], "reservation_id": reservation["id"], "title": gift["title"], "category": gift["category"]})
+    return {"gifts": matches}
 
 
 @app.post("/api/gifts/change")
