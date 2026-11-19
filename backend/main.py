@@ -126,7 +126,7 @@ def health():
 
 @app.get("/api/gifts")
 def list_gifts():
-    return [public_gift(g) for g in gifts.find().sort("created_at", 1) if len(g.get("reservations", [])) < g["quantity"]]
+    return [public_gift(g) for g in gifts.find().sort("created_at", 1)]
 
 
 @app.post("/api/gifts/find")

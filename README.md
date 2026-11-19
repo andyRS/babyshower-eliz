@@ -1,6 +1,6 @@
 # Baby shower de Eliz Maribeth
 
-Aplicación React + FastAPI + MongoDB Atlas para coordinar los regalos. La vista pública muestra una hoja que se abre al tocarla, sin imágenes ni cantidades; solo aparecen regalos que aún tienen cupo. Cada persona se anota con su primer nombre y primer apellido y recibe un código privado de reserva. Para consultar o cambiar su elección necesita ese código y su nombre; el cambio devuelve la unidad anterior y descuenta la nueva en una transacción. El panel de administración permite ver todas las reservas y cantidades, copiar códigos de reservas anteriores, agregar regalos, ajustar cantidades con controles `−` y `+`, editar detalles, quitar reservas y eliminar regalos sin reservas.
+Aplicación React + FastAPI + MongoDB Atlas para coordinar los regalos. La vista pública muestra una hoja que se abre al tocarla, sin imágenes ni cantidades; los regalos sin cupo aparecen grises, tachados y con «AGOTADO», sin revelar quién los eligió. Cada persona se anota con su primer nombre y primer apellido y recibe un código privado de reserva. Para consultar o cambiar su elección necesita ese código y su nombre; el cambio devuelve la unidad anterior y descuenta la nueva en una transacción. El panel de administración permite ver todas las reservas y cantidades, copiar códigos de reservas anteriores, agregar regalos, ajustar cantidades con controles `−` y `+`, editar detalles, quitar reservas y eliminar regalos sin reservas.
 
 ## Inicio rápido
 
