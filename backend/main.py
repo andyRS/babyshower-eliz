@@ -61,6 +61,10 @@ class ReservationIn(BaseModel):
     name: str = Field(min_length=2, max_length=80)
 
 
+class LookupIn(ReservationIn):
+    code: str = Field(min_length=36, max_length=36)
+
+
 class ChangeGiftIn(ReservationIn):
     from_gift_id: str
     reservation_id: str
@@ -122,18 +126,19 @@ def health():
 
 @app.get("/api/gifts")
 def list_gifts():
-    return [public_gift(g) for g in gifts.find().sort("created_at", 1)]
+    return [public_gift(g) for g in gifts.find().sort("created_at", 1) if len(g.get("reservations", [])) < g["quantity"]]
 
 
 @app.post("/api/gifts/find")
-def find_my_gifts(data: ReservationIn):
+def find_my_gifts(data: LookupIn):
     key = name_key(clean_name(data.name))
-    matches = []
-    for gift in gifts.find({}, {"title": 1, "category": 1, "reservations.name": 1, "reservations.id": 1}):
-        for reservation in gift.get("reservations", []):
-            if name_key(reservation["name"]) == key:
-                matches.append({"id": gift["_id"], "reservation_id": reservation["id"], "title": gift["title"], "category": gift["category"]})
-    return {"gifts": matches}
+    gift = gifts.find_one({"reservations.id": data.code}, {"title": 1, "category": 1, "reservations.name": 1, "reservations.id": 1})
+    if gift is None:
+        return {"gifts": []}
+    reservation = next((r for r in gift.get("reservations", []) if r["id"] == data.code), None)
+    if reservation is None or name_key(reservation["name"]) != key:
+        return {"gifts": []}
+    return {"gifts": [{"id": gift["_id"], "reservation_id": reservation["id"], "title": gift["title"], "category": gift["category"]}]}
 
 
 @app.post("/api/gifts/change")
